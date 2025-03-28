@@ -259,6 +259,28 @@ namespace ACE.Server.WorldObjects
             if (AttackSequence != attackSequence)
                 return;
 
+            // Check if we're in a healing or looting animation and cancel it properly
+            if (IsBusy && CurrentMotionState != null && 
+                ((MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.SkillHealSelf || 
+                 (MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.SkillHealOther ||
+                 (MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.Pickup ||
+                 (MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.Pickup5 ||
+                 (MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.Pickup10 ||
+                 (MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.Pickup15 ||
+                 (MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.Pickup20))
+            {
+                // Force reset the healing/pickup animation state
+                IsBusy = false;
+                SendUseDoneEvent();
+                
+                // Give a slight delay to ensure animations can transition properly
+                var newActionChain = new ActionChain();
+                newActionChain.AddDelaySeconds(0.5f);
+                newActionChain.AddAction(this, () => Attack(target, attackSequence, subsequent));
+                newActionChain.EnqueueChain();
+                return;
+            }
+
             if (CombatMode != CombatMode.Melee || MeleeTarget == null || IsBusy || !IsAlive || suicideInProgress)
             {
                 OnAttackDone();

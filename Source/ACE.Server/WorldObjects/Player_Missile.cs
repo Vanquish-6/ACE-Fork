@@ -145,7 +145,7 @@ namespace ACE.Server.WorldObjects
         {
             if (AttackSequence != attackSequence)
                 return;
-
+                
             var weapon = GetEquippedMissileWeapon();
             if (weapon == null || CombatMode == CombatMode.NonCombat)
             {
@@ -161,6 +161,28 @@ namespace ACE.Server.WorldObjects
             }
 
             var launcher = GetEquippedMissileLauncher();
+
+            // Check if we're in a healing or looting animation and cancel it properly
+            if (IsBusy && CurrentMotionState != null && 
+                ((MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.SkillHealSelf || 
+                 (MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.SkillHealOther ||
+                 (MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.Pickup ||
+                 (MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.Pickup5 ||
+                 (MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.Pickup10 ||
+                 (MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.Pickup15 ||
+                 (MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.Pickup20))
+            {
+                // Force reset the healing/pickup animation state
+                IsBusy = false;
+                SendUseDoneEvent();
+                
+                // Give a slight delay to ensure animations can transition properly
+                var healActionChain = new ActionChain();
+                healActionChain.AddDelaySeconds(0.5f);
+                healActionChain.AddAction(this, () => LaunchMissile(target, attackSequence, stance, subsequent));
+                healActionChain.EnqueueChain();
+                return;
+            }
 
             var creature = target as Creature;
             if (!IsAlive || IsBusy || MissileTarget == null || creature == null || !creature.IsAlive || suicideInProgress)

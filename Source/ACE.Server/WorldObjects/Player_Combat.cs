@@ -787,6 +787,39 @@ namespace ACE.Server.WorldObjects
             if (CombatMode == CombatMode.Magic && MagicState.IsCasting)
                 FailCast();
 
+            // Ensure complete attack state cleanup when switching between combat modes
+            // This helps prevent the infinite attack bar charging loop that can occur
+            // particularly when transitioning from magic or healing animations
+            Attacking = false;
+            AttackCancelled = false;
+            
+            // Handle possible stuck healing or lootinganimation state
+            if (IsBusy && CurrentMotionState != null && 
+                ((MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.SkillHealSelf || 
+                 (MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.SkillHealOther ||
+                 (MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.Pickup ||
+                 (MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.Pickup5 ||
+                 (MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.Pickup10 ||
+                 (MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.Pickup15 ||
+                 (MotionCommand)CurrentMotionState.MotionState.ForwardCommand == MotionCommand.Pickup20))
+            {
+                // Force reset the healing/pickup animation state
+                IsBusy = false;
+                SendUseDoneEvent();
+            }
+            
+            // Ensure attack queue is cleared
+            if (AttackTarget != null || MeleeTarget != null || MissileTarget != null)
+                AttackQueue.Clear();
+                
+            // Reset animation states that might be stuck
+            if (PhysicsObj != null && PhysicsObj.MovementManager != null && 
+                PhysicsObj.MovementManager.MotionInterpreter != null)
+            {
+                PhysicsObj.MovementManager.MotionInterpreter.PendingMotions.Clear();
+                PhysicsObj.IsAnimating = false;
+            }
+
             HandleActionCancelAttack();
 
             float animTime = 0.0f, queueTime = 0.0f;
@@ -938,7 +971,7 @@ namespace ACE.Server.WorldObjects
                 return 1.0f;
 
             // http://acpedia.org/wiki/Announcements_-_11th_Anniversary_Preview#Void_Magic_and_You.21
-            // Creatures under Asheron’s protection take half damage from any nether type spell.
+            // Creatures under Asheron's protection take half damage from any nether type spell.
             if (damageType == DamageType.Nether)
                 return 0.5f;
 
